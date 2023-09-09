@@ -5,10 +5,12 @@ function isNumberInRange(number, min, max)
 end
 
 local function getDefaultSettings()
-    return {
-        enable = 1,
-        max_npc = 35
-    }
+    local fullPath = pathData .. "settings/default.json"
+    if not file.Exists(fullPath, "DATA") then
+        file.CreateDir(pathData .. "settings/")
+        file.Write(fullPath, util.TableToJSON({enable = 1, max_npc = 35}))
+    end
+    return util.JSONToTable(file.Read(fullPath, "DATA"))
 end
 
 local function writeMapSettings(mapName, settings)
@@ -26,7 +28,7 @@ local function readMapSettings(mapName)
         PrintMessage(HUD_PRINTTALK, "[Background NPCs - Auto Toggler] " .. mapName .. ".json found, reading settings for " .. mapName)
     end
     local fileContent = file.Read(filePath, "DATA")
-    return util.JSONToTable(fileContent) or getDefaultSettings()
+    return util.JSONToTable(fileContent)
 end
 
 local function setMapSettings(mapSettings)
@@ -52,23 +54,52 @@ local function loadMapSettings()
     setMapSettings(currentMapSettings)
 end
 
-local function bgn_autotoggler_default_change(player, _, args)
-    local enable, max_npc = tonumber(args[1]), tonumber(args[2])
-    
-    if not player:IsSuperAdmin() or not isNumberInRange(enable, 0, 1) or not isNumberInRange(max_npc, 0, 200) then
+local function bgn_autotoggler_save()
+    local currentMap = game.GetMap()
+    local enable = GetConVar("bgn_enable"):GetInt()
+    local max_npc = GetConVar("bgn_max_npc"):GetInt()
+
+    local newMapSettings = {
+        enable = enable,
+        max_npc = max_npc
+    }
+
+    writeMapSettings(currentMap, newMapSettings)
+end
+
+local function bgn_autotoggler_default()
+    local currentMap = game.GetMap()
+    writeMapSettings(currentMap)
+    loadMapSettings()
+    PrintMessage(HUD_PRINTCONSOLE, "[Background NPCs - Auto Toggler] Default settings loaded")
+end
+
+local function bgn_autotoggler_default_change(enable, max_npc)
+    if (not enable or not isNumberInRange(enable, 0, 1)) or (not max_npc or not isNumberInRange(max_npc, 0, 200)) then
         PrintMessage(HUD_PRINTCONSOLE, "bgn_autotoggler_default_change [enable] [max_npc] - enable = 0 or 1, max_npc = between 0 and 200")
         return
     end
 
-    -- Apply your default settings change logic here
-    print("Default settings changed:", enable, max_npc)
+    local fullPath = pathData .. "settings/default.json"
+    file.Write(fullPath, util.TableToJSON({enable = enable, max_npc = max_npc}))
+    PrintMessage(HUD_PRINTCONSOLE, "[Background NPCs - Auto Toggler] New default settings: " .. enable .. " " .. max_npc)
 end
 
-concommand.Add("bgn_autotoggler_write", bgn_autotoggler_write)
-concommand.Add("bgn_autotoggler_reload", bgn_autotoggler_reload)
-concommand.Add("bgn_autotoggler_default_change", bgn_autotoggler_default_change, nil, "changes the default settings to generate for every map that haven't being played yet")
+concommand.Add("bgn_autotoggler_save", function(player)
+    if not player:IsSuperAdmin() then return end
+    bgn_autotoggler_save()
+end)
 
-cvars.AddChangeCallback("bgn_enable", bgn_autotoggler_write)
-cvars.AddChangeCallback("bgn_max_npc", bgn_autotoggler_write)
+concommand.Add("bgn_autotoggler_default", function(player)
+    if not player:IsSuperAdmin() then return end
+    bgn_autotoggler_default()
+end)
+concommand.Add("bgn_autotoggler_default_change", function(player, _, args)
+    if not player:IsSuperAdmin() then return end
+    bgn_autotoggler_default_change(tonumber(args[1]), tonumber(args[2]))
+end)
+
+cvars.AddChangeCallback("bgn_enable", bgn_autotoggler_save)
+cvars.AddChangeCallback("bgn_max_npc", bgn_autotoggler_save)
 
 hook.Add("Initialize", "bgn_autotoggler_startup", loadMapSettings)
