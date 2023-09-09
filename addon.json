@@ -1,0 +1,13 @@
+{
+    "title": "Background NPCs - Auto Toggler",
+    "description": "",
+    "type": "tool",
+    "tags": [
+        "roleplay",
+        "fun"
+    ],
+    "ignore": [
+        ".git/*",
+        "README.md"
+    ]
+}
